@@ -21,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { isStatus } from '@/lib/status';
+import { getWorkflowErrorMessage } from '@/lib/workflows';
 
 interface BatchRow extends Batch {
   surat_jalan_count: number;
@@ -101,11 +103,14 @@ export default function BatchListPage() {
   }
 
   async function handleSendToQs(batch: BatchRow) {
-    const ok = await sendBatchToQs(batch.id);
-    if (!ok) return toast.error('Gagal mengirim batch ke QS');
-    await logActivity(`Mengirim batch "${batch.nama_batch}" ke QS`);
-    toast.success('Batch dikirim ke QS');
-    load();
+    try {
+      await sendBatchToQs(batch.id);
+      await logActivity(`Mengirim batch "${batch.nama_batch}" ke QS`);
+      toast.success('Batch dikirim ke QS');
+      load();
+    } catch (error) {
+      toast.error('Gagal mengirim batch ke QS', { description: getWorkflowErrorMessage(error) });
+    }
   }
 
   function handleExport(format: 'excel' | 'pdf' | 'print') {
@@ -174,7 +179,7 @@ export default function BatchListPage() {
       size: 260,
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          {row.original.status === 'Belum Dikirim' && (
+          {isStatus(row.original.status, 'READY_FOR_QS') && (
             <Button
               variant="outline"
               size="sm"
@@ -184,7 +189,7 @@ export default function BatchListPage() {
               <Send className="h-3.5 w-3.5" /> Kirim ke QS
             </Button>
           )}
-          {row.original.status === 'Proses QS' && (
+          {(isStatus(row.original.status, 'IN_QS_REVIEW') || isStatus(row.original.status, 'SPK_ISSUED')) && row.original.spk_count < row.original.cluster_count && (
             <Button
               size="sm"
               onClick={() => navigate(`/batch/${row.original.id}?action=spk`)}
@@ -236,9 +241,9 @@ export default function BatchListPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Total Batch', value: rows.length },
-          { label: 'Belum Dikirim', value: rows.filter((r) => r.status === 'Belum Dikirim').length },
-          { label: 'Proses QS', value: rows.filter((r) => r.status === 'Proses QS').length },
-          { label: 'Selesai', value: rows.filter((r) => r.status === 'Selesai').length },
+          { label: 'Siap Dikirim', value: rows.filter((r) => isStatus(r.status, 'READY_FOR_QS')).length },
+          { label: 'Proses QS', value: rows.filter((r) => isStatus(r.status, 'IN_QS_REVIEW')).length },
+          { label: 'Selesai', value: rows.filter((r) => isStatus(r.status, 'COMPLETED')).length },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="p-4">

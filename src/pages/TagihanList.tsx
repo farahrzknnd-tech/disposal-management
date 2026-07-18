@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatRupiah, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
+import { isStatus } from '@/lib/status';
+import { completeSpkWorkflow, getWorkflowErrorMessage } from '@/lib/workflows';
 
 export default function TagihanListPage() {
   const [rows, setRows] = useState<SpkWithRelations[]>([]);
@@ -21,7 +23,7 @@ export default function TagihanListPage() {
     const { data } = await supabase
       .from('spk')
       .select('*, cluster:master_cluster(*), batch:batch(*)')
-      .neq('status', 'Draft')
+      .neq('status', 'DRAFT')
       .order('created_at', { ascending: false });
     setRows((data as unknown as SpkWithRelations[]) ?? []);
     setLoading(false);
@@ -37,22 +39,19 @@ export default function TagihanListPage() {
   );
   const totalPaid = useMemo(
     () =>
-      rows.filter((r) => r.status === 'Selesai').reduce((acc, r) => acc + Number(r.nominal_tagihan ?? 0), 0),
+      rows.filter((r) => isStatus(r.status, 'COMPLETED')).reduce((acc, r) => acc + Number(r.nominal_tagihan ?? 0), 0),
     [rows]
   );
 
-  async function markSelesai(id: string, batchId: string) {
-    const { error } = await supabase.from('spk').update({ status: 'Selesai' }).eq('id', id);
-    if (error) return toast.error('Gagal menandai selesai');
-    const { data: allSpk } = await supabase.from('spk').select('status').eq('batch_id', batchId);
-    const allDone = (allSpk ?? []).every((s: any) => s.status === 'Selesai');
-    if (allDone) {
-      await supabase.from('batch').update({ status: 'Selesai' }).eq('id', batchId);
-      await supabase.from('surat_jalan').update({ status: 'Selesai' }).eq('batch_id', batchId);
+  async function markSelesai(id: string) {
+    try {
+      await completeSpkWorkflow({ spkId: id });
+      await logActivity('Menandai SPK selesai');
+      toast.success('SPK ditandai selesai');
+      load();
+    } catch (error) {
+      toast.error('Gagal menandai selesai', { description: getWorkflowErrorMessage(error) });
     }
-    await logActivity('Menandai SPK selesai');
-    toast.success('SPK ditandai selesai');
-    load();
   }
 
   const columns: ColumnDef<SpkWithRelations>[] = [
@@ -100,11 +99,11 @@ export default function TagihanListPage() {
       header: 'Aksi',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          {row.original.status === 'Tagihan Diserahkan' && (
+          {isStatus(row.original.status, 'INVOICED') && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => markSelesai(row.original.id, row.original.batch_id)}
+              onClick={() => markSelesai(row.original.id)}
               className="gap-1"
             >
               <CheckCircle2 className="h-3.5 w-3.5" /> Selesai

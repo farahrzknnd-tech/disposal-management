@@ -21,9 +21,11 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      assign_surat_jalan_to_auto_batches: { Args: { p_surat_jalan_ids: string[] }; Returns: Json };
       send_batch_to_qs: { Args: { p_batch_id: string }; Returns: Json };
       issue_spk_for_batch_cluster: { Args: { p_batch_id: string; p_cluster_id: string; p_nomor_spk?: string; p_tanggal_spk?: string; p_nominal_spk?: number }; Returns: Json };
-      complete_spk_workflow: { Args: { p_spk_id: string; p_nomor_tagihan?: string; p_tanggal_tagihan?: string; p_nominal_tagihan?: number }; Returns: Json };
+      submit_spk_invoice: { Args: { p_spk_id: string; p_nomor_tagihan: string; p_tanggal_tagihan: string; p_nominal_tagihan: number; p_catatan?: string | null }; Returns: Json };
+      complete_spk_workflow: { Args: { p_spk_id: string }; Returns: Json };
       cancel_batch: { Args: { p_batch_id: string; p_reason?: string }; Returns: Json };
     };
     Enums: Record<string, never>;

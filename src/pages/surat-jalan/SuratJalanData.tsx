@@ -36,6 +36,9 @@ import {
 import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/export';
 import { assignSuratJalanToAutoBatch } from '@/lib/batchService';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth';
+import { getWorkflowErrorMessage, type AssignBatchResult } from '@/lib/workflows';
+import { assertValidAssignResult, formatAssignSuccess } from '@/lib/batchAssignment';
 
 type SJRow = SuratJalanWithRelations & {
   batchLabel: string;
@@ -44,6 +47,7 @@ type SJRow = SuratJalanWithRelations & {
 export default function SuratJalanData() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canWrite } = useAuth();
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterCluster, setFilterCluster] = useState<string>('all');
@@ -135,21 +139,22 @@ export default function SuratJalanData() {
     onError: (err) => toast.error('Gagal menghapus: ' + err.message),
   });
 
-  const assignBatchMutation = useMutation({
+  const assignBatchMutation = useMutation<AssignBatchResult, Error, string[]>({
     mutationFn: async (ids: string[]) => {
-      const touched = await assignSuratJalanToAutoBatch(ids);
-      if (touched.size > 0) {
-        await logActivity(`Menempatkan ${ids.length} surat jalan ke batch otomatis`);
-      }
-      return touched;
+      const result = await assignSuratJalanToAutoBatch(ids);
+      assertValidAssignResult(result, ids.length);
+      await logActivity(`Menempatkan ${result.assigned_count} surat jalan ke batch otomatis`);
+      return result;
     },
-    onSuccess: () => {
-      toast.success('Surat jalan dimasukkan ke batch otomatis');
+    onSuccess: (result) => {
+      toast.success(`${result.assigned_count} Surat Jalan berhasil dimasukkan`, {
+        description: formatAssignSuccess(result),
+      });
       setSelected({});
       queryClient.invalidateQueries({ queryKey: ['surat_jalan'] });
       queryClient.invalidateQueries({ queryKey: ['batch'] });
     },
-    onError: (err) => toast.error('Gagal memasukkan ke batch: ' + err.message),
+    onError: (err) => toast.error('Gagal memasukkan ke batch', { description: getWorkflowErrorMessage(err) }),
   });
 
   const bulkDeleteMutation = useMutation({
@@ -182,7 +187,7 @@ export default function SuratJalanData() {
     {
       id: 'select',
       header: () => {
-        const visibleIds = filtered.map((r) => r.id);
+        const visibleIds = filtered.filter((r) => !r.batch_id).map((r) => r.id);
         const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected[id]);
         return (
           <Checkbox
@@ -201,10 +206,11 @@ export default function SuratJalanData() {
       cell: ({ row }) => (
         <Checkbox
           checked={!!selected[row.original.id]}
+          disabled={!canWrite || !!row.original.batch_id}
           onCheckedChange={(v) =>
             setSelected((prev) => {
               const next = { ...prev };
-              if (v) next[row.original.id] = true;
+              if (v && !row.original.batch_id) next[row.original.id] = true;
               else delete next[row.original.id];
               return next;
             })
@@ -413,12 +419,14 @@ export default function SuratJalanData() {
               <Button variant="outline" onClick={() => setSelected({})}>
                 Batal Pilih
               </Button>
-              <Button
-                onClick={() => assignBatchMutation.mutate(selectedIds)}
-                disabled={assignBatchMutation.isPending}
-              >
-                <Layers className="mr-2 h-4 w-4" /> Assign ke Batch
-              </Button>
+              {canWrite && (
+                <Button
+                  onClick={() => assignBatchMutation.mutate(selectedIds)}
+                  disabled={assignBatchMutation.isPending}
+                >
+                  <Layers className="mr-2 h-4 w-4" /> {assignBatchMutation.isPending ? 'Assign...' : 'Assign ke Batch'}
+                </Button>
+              )}
               <Button
                 variant="destructive"
                 onClick={() => bulkDeleteMutation.mutate(selectedIds)}

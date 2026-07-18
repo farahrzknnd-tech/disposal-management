@@ -28,6 +28,8 @@ import { sendBatchToQs } from '@/lib/batchService';
 import { computeSpkStatus, computeSJProgress } from '@/lib/batchStatus';
 import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/export';
 import { toast } from 'sonner';
+import { isStatus } from '@/lib/status';
+import { getWorkflowErrorMessage, issueSpkForBatchCluster } from '@/lib/workflows';
 
 interface DetailData {
   batch: Batch | null;
@@ -68,10 +70,10 @@ export default function BatchDetailPage() {
   }, [load]);
 
   useEffect(() => {
-    if (params.get('action') === 'spk' && data?.batch?.status === 'Proses QS') {
+    if (params.get('action') === 'spk' && data?.batch && (isStatus(data.batch.status, 'IN_QS_REVIEW') || isStatus(data.batch.status, 'SPK_ISSUED'))) {
       setShowSpkForm(true);
     }
-  }, [params, data?.batch?.status]);
+  }, [params, data?.batch]);
 
   const clustersInBatch = useMemo(() => {
     if (!data) return [];
@@ -81,11 +83,14 @@ export default function BatchDetailPage() {
 
   async function handleSendToQs() {
     if (!data?.batch) return;
-    const ok = await sendBatchToQs(data.batch.id);
-    if (!ok) return toast.error('Gagal mengirim ke QS');
-    await logActivity(`Mengirim batch "${data.batch.nama_batch}" ke QS`);
-    toast.success('Batch dikirim ke QS');
-    load();
+    try {
+      await sendBatchToQs(data.batch.id);
+      await logActivity(`Mengirim batch "${data.batch.nama_batch}" ke QS`);
+      toast.success('Batch dikirim ke QS');
+      load();
+    } catch (error) {
+      toast.error('Gagal mengirim ke QS', { description: getWorkflowErrorMessage(error) });
+    }
   }
 
   if (loading) return <TableSkeleton rows={4} cols={4} />;
@@ -108,7 +113,8 @@ export default function BatchDetailPage() {
   const totalPickup = data.suratJalan.reduce((a, s) => a + (s.pickup ?? 0), 0);
   const totalDamTruck = data.suratJalan.reduce((a, s) => a + (s.dam_truck ?? 0), 0);
   const estimasi = hitungEstimasi(totalPickup, totalDamTruck);
-  const sentToQs = !!batch.tanggal_kirim_qs;
+  const sentToQs = isStatus(batch.status, 'IN_QS_REVIEW') || isStatus(batch.status, 'SPK_ISSUED') || isStatus(batch.status, 'INVOICED') || isStatus(batch.status, 'COMPLETED');
+  const canIssueMoreSpk = (isStatus(batch.status, 'IN_QS_REVIEW') || isStatus(batch.status, 'SPK_ISSUED')) && data.spks.length < clustersInBatch.length;
 
   function handleExport(format: 'excel' | 'pdf' | 'print') {
     if (!data) return;
@@ -136,12 +142,12 @@ export default function BatchDetailPage() {
             <Button variant="outline" onClick={() => navigate('/batch')}>
               <ArrowLeft className="mr-2 h-4 w-4" /> Kembali
             </Button>
-            {batch.status === 'Belum Dikirim' && (
+            {isStatus(batch.status, 'READY_FOR_QS') && (
               <Button onClick={handleSendToQs}>
                 <Send className="mr-2 h-4 w-4" /> Kirim ke QS
               </Button>
             )}
-            {batch.status === 'Proses QS' && (
+            {canIssueMoreSpk && (
               <Button onClick={() => setShowSpkForm(true)}>
                 <FileSignature className="mr-2 h-4 w-4" /> Terbit SPK
               </Button>
@@ -267,7 +273,7 @@ export default function BatchDetailPage() {
                         <Button asChild variant="outline" size="sm">
                           <Link to={`/spk/${clusterSpk.id}`}>Lihat SPK</Link>
                         </Button>
-                      ) : batch.status === 'Proses QS' ? (
+                      ) : canIssueMoreSpk ? (
                         <Button
                           variant="outline"
                           size="sm"
@@ -345,36 +351,22 @@ function SpkFormDialog({
       return;
     }
     setSaving(true);
-    const { data: spk, error } = await supabase
-      .from('spk')
-      .insert({
-        batch_id: batchId,
-        cluster_id: clusterId,
-        nomor_spk: nomorSpk,
-        tanggal_spk: tanggalSpk,
-        nominal_spk: nominalSpk ? Number(nominalSpk) : null,
-        catatan: catatan || null,
-        status: 'SPK Terbit',
-      })
-      .select('id')
-      .maybeSingle();
-
-    if (error || !spk) {
+    try {
+      await issueSpkForBatchCluster({
+        batchId,
+        clusterId,
+        nomorSpk,
+        tanggalSpk,
+        nominalSpk: nominalSpk ? Number(nominalSpk) : null,
+      });
+      await logActivity(`Menerbitkan SPK ${nomorSpk}`);
+      toast.success('SPK berhasil diterbitkan');
+      onSaved();
+    } catch (error) {
+      toast.error('Gagal menerbitkan SPK', { description: getWorkflowErrorMessage(error) });
+    } finally {
       setSaving(false);
-      return toast.error('Gagal menerbitkan SPK');
     }
-
-    // Connect related Surat Jalan to this SPK
-    await supabase
-      .from('surat_jalan')
-      .update({ spk_id: spk.id, status: 'SPK Terbit' })
-      .eq('batch_id', batchId)
-      .eq('cluster_id', clusterId);
-
-    await logActivity(`Menerbitkan SPK ${nomorSpk}`);
-    setSaving(false);
-    toast.success('SPK berhasil diterbitkan');
-    onSaved();
   }
 
   return (

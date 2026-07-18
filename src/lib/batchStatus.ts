@@ -2,43 +2,34 @@ import type { Spk, StatusBatch, StatusSJ, StatusSpk } from "./types";
 import { getBatchSegment } from "./constants";
 import { normalizeStatus } from "./status";
 
-/**
- * Compute a Batch status from its SPKs and whether it has been sent to QS.
- * Belum Dikirim -> Proses QS -> Selesai
- */
 export function computeBatchStatus(
-  _clusterCount: number,
+  clusterCount: number,
   spks: Spk[],
   sentToQs: boolean
 ): StatusBatch {
-  if (spks.length > 0 && spks.every((s) => normalizeStatus(s.status) === "COMPLETED")) return "Selesai";
-  if (sentToQs) return "Proses QS";
-  return "Belum Dikirim";
+  if (clusterCount > 0 && spks.length >= clusterCount && spks.every((s) => normalizeStatus(s.status) === "COMPLETED")) return "COMPLETED";
+  if (clusterCount > 0 && spks.length >= clusterCount && spks.every((s) => ["INVOICED", "COMPLETED"].includes(normalizeStatus(s.status)))) return "INVOICED";
+  if (clusterCount > 0 && spks.length >= clusterCount) return "SPK_ISSUED";
+  if (sentToQs) return "IN_QS_REVIEW";
+  return "READY_FOR_QS";
 }
 
-/**
- * Compute the SPK status label.
- * Draft -> SPK Terbit -> Tagihan -> Selesai
- */
 export function computeSpkStatus(spk: Spk | null | undefined): StatusSpk {
-  if (!spk) return "Draft";
-  if (normalizeStatus(spk.status) === "COMPLETED") return "Selesai";
-  if (spk.nomor_tagihan) return "Tagihan";
-  if (spk.nomor_spk) return "SPK Terbit";
-  return "Draft";
+  if (!spk) return "DRAFT";
+  const status = normalizeStatus(spk.status);
+  if (status !== "DRAFT") return status;
+  if (spk.nomor_tagihan) return "INVOICED";
+  if (spk.nomor_spk) return "SPK_ISSUED";
+  return "DRAFT";
 }
 
-/**
- * Compute the Surat Jalan progress label inside a batch.
- * Menunggu QS -> Proses QS -> SPK Terbit -> Finished
- */
 export function computeSJProgress(
   _sj: { spk_id?: string | null; status?: string | null },
   batchSentToQs: boolean,
   spkStatus: StatusSpk | null
 ): StatusSJ {
-  if (spkStatus === "Selesai") return "Finished";
-  if (spkStatus === "Tagihan" || spkStatus === "SPK Terbit") return "SPK Terbit";
+  if (spkStatus === "COMPLETED") return "Finished";
+  if (spkStatus === "INVOICED" || spkStatus === "SPK_ISSUED") return "SPK Terbit";
   if (batchSentToQs) return "Proses QS";
   return "Menunggu QS";
 }

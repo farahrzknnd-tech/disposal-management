@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/export';
+import { isStatus } from '@/lib/status';
 
 interface SpkRow {
   id: string;
@@ -129,9 +130,9 @@ export default function SpkListPage() {
       <div className="grid gap-4 sm:grid-cols-4">
         {[
           { label: 'Total SPK', value: rows.length },
-          { label: 'SPK Terbit', value: rows.filter((r) => r.status === 'SPK Terbit').length },
-          { label: 'Tagihan', value: rows.filter((r) => r.status === 'Tagihan').length },
-          { label: 'Selesai', value: rows.filter((r) => r.status === 'Selesai').length },
+          { label: 'SPK Terbit', value: rows.filter((r) => isStatus(r.status, 'SPK_ISSUED')).length },
+          { label: 'Tagihan', value: rows.filter((r) => isStatus(r.status, 'INVOICED')).length },
+          { label: 'Selesai', value: rows.filter((r) => isStatus(r.status, 'COMPLETED')).length },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="p-4">

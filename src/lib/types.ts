@@ -77,11 +77,11 @@ export interface AuditLog {
   tanggal: string;
 }
 
-// Workflow statuses for Batch (Belum Dikirim -> Proses QS -> Selesai)
-export type StatusBatch = "Belum Dikirim" | "Proses QS" | "Selesai";
+// Canonical persisted workflow status.
+export type StatusBatch = WorkflowStatus;
 
-// Workflow statuses for SPK (Draft -> SPK Terbit -> Tagihan -> Selesai)
-export type StatusSpk = "Draft" | "SPK Terbit" | "Tagihan" | "Selesai";
+// Canonical persisted SPK status.
+export type StatusSpk = WorkflowStatus;
 
 // Progress labels for Surat Jalan inside a Batch
 export type StatusSJ = "Menunggu QS" | "Proses QS" | "SPK Terbit" | "Finished";
@@ -106,3 +106,4 @@ export interface BatchWithRelations extends Batch {
   surat_jalan?: SuratJalan[];
   spk?: Spk[];
 }
+import type { WorkflowStatus } from "./status";

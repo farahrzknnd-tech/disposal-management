@@ -18,6 +18,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/export';
 import { toast } from 'sonner';
+import { completeSpkWorkflow, getWorkflowErrorMessage, submitSpkInvoice } from '@/lib/workflows';
+import { isStatus } from '@/lib/status';
 
 interface DetailData {
   spk: Spk | null;
@@ -103,44 +105,37 @@ export default function SpkDetailPage() {
       return;
     }
     setSaving(true);
-    const newStatus = 'Tagihan';
-    const { error } = await supabase
-      .from('spk')
-      .update({
-        nomor_tagihan: nomorTagihan,
-        tanggal_tagihan: tanggalTagihan,
-        nominal_tagihan: nominalTagihan ? Number(nominalTagihan) : null,
+    try {
+      await submitSpkInvoice({
+        spkId: id,
+        nomorTagihan,
+        tanggalTagihan,
+        nominalTagihan: nominalTagihan ? Number(nominalTagihan) : 0,
         catatan: catatanTagihan || null,
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-    setSaving(false);
-    if (error) return toast.error('Gagal menyimpan tagihan');
-    await logActivity(`Menyimpan tagihan ${nomorTagihan} untuk SPK ${data.spk?.nomor_spk}`);
-    toast.success('Tagihan disimpan. Status SPK: Tagihan');
-    load();
+      });
+      await logActivity(`Menyimpan tagihan ${nomorTagihan} untuk SPK ${data.spk?.nomor_spk}`);
+      toast.success('Tagihan disimpan. Status SPK: Ditagihkan');
+      load();
+    } catch (error) {
+      toast.error('Gagal menyimpan tagihan', { description: getWorkflowErrorMessage(error) });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleMarkSelesai() {
     if (!data?.spk || !id) return;
     setMarking(true);
-    const { error } = await supabase
-      .from('spk')
-      .update({ status: 'Selesai', updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (!error) {
-      await supabase
-        .from('surat_jalan')
-        .update({ status: 'Selesai' })
-        .eq('spk_id', id);
+    try {
+      await completeSpkWorkflow({ spkId: id });
       await logActivity(`SPK ${data.spk.nomor_spk} ditandai selesai`);
       toast.success('SPK ditandai selesai');
-    } else {
-      toast.error('Gagal menandai selesai');
+      load();
+    } catch (error) {
+      toast.error('Gagal menandai selesai', { description: getWorkflowErrorMessage(error) });
+    } finally {
+      setMarking(false);
     }
-    setMarking(false);
-    load();
   }
 
   function handleExport(format: 'excel' | 'pdf' | 'print') {
@@ -303,7 +298,7 @@ export default function SpkDetailPage() {
             <Button onClick={handleSaveTagihan} disabled={saving}>
               {saving ? 'Menyimpan...' : 'Simpan Tagihan'}
             </Button>
-            {status === 'Tagihan' && (
+            {isStatus(status, 'INVOICED') && (
               <Button variant="outline" onClick={handleMarkSelesai} disabled={marking}>
                 <CheckCircle2 className="mr-2 h-4 w-4" /> Tandai Selesai
               </Button>
