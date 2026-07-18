@@ -23,7 +23,8 @@ export type Database = {
     Functions: {
       assign_surat_jalan_to_batch: { Args: { p_batch_id: string; p_surat_jalan_ids: string[] }; Returns: Json };
       create_batch_and_assign_surat_jalan: { Args: { p_bulan_batch: string; p_urutan_batch: number; p_tanggal_diterima: string; p_catatan: string | null; p_surat_jalan_ids: string[] }; Returns: Json };
-      delete_ready_batch: { Args: { p_batch_id: string }; Returns: Json };
+      delete_surat_jalan_safely: { Args: { p_surat_jalan_ids: string[] }; Returns: Json };
+      delete_batch_safely: { Args: { p_batch_id: string }; Returns: Json };
       refresh_batch_workflow_status: { Args: { p_batch_id: string }; Returns: string };
       send_batch_to_qs: { Args: { p_batch_id: string }; Returns: Json };
       issue_spk_for_batch_cluster: { Args: { p_batch_id: string; p_cluster_id: string; p_nomor_spk?: string; p_tanggal_spk?: string; p_nominal_spk?: number }; Returns: Json };

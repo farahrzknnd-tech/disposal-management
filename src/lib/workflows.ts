@@ -10,6 +10,8 @@ export type AssignBatchResult = {
 };
 
 export type WorkflowResult = Record<string, unknown>;
+export type DeleteSuratJalanResult = { requested_count: number; deleted_count: number; affected_batch_ids: string[] };
+export type DeleteBatchResult = { batch_id: string; released_count: number; orphan_cleanup: boolean; deleted_spk_count: number; batch_status?: string; batch_name?: string };
 
 export function getWorkflowErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -37,8 +39,12 @@ export function createBatchAndAssignSuratJalan(args: { bulanBatch: string; uruta
   });
 }
 
-export function deleteReadyBatch(batchId: string): Promise<WorkflowResult> {
-  return callWorkflow("delete_ready_batch", { p_batch_id: batchId });
+export function deleteSuratJalanSafely(ids: string[]): Promise<DeleteSuratJalanResult> {
+  return callWorkflow("delete_surat_jalan_safely", { p_surat_jalan_ids: ids });
+}
+
+export function deleteBatchSafely(batchId: string): Promise<DeleteBatchResult> {
+  return callWorkflow("delete_batch_safely", { p_batch_id: batchId });
 }
 
 export function sendBatchToQsRpc(batchId: string): Promise<WorkflowResult> {

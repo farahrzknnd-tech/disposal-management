@@ -23,8 +23,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { isStatus } from '@/lib/status';
-import { deleteReadyBatch, getWorkflowErrorMessage } from '@/lib/workflows';
+import { deleteBatchSafely, getWorkflowErrorMessage, type DeleteBatchResult } from '@/lib/workflows';
 import { affectedWorkflowQueries } from '@/lib/queryKeys';
+import { useAuth } from '@/lib/auth';
+import { canDeleteBatch } from '@/lib/deletionRules';
 
 interface BatchRow extends Batch {
   surat_jalan_count: number;
@@ -38,6 +40,7 @@ interface BatchRow extends Batch {
 export default function BatchListPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { canAdmin } = useAuth();
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -97,9 +100,11 @@ export default function BatchListPage() {
   async function confirmDelete() {
     if (!deleteId) return;
     try {
-      await deleteReadyBatch(deleteId);
+      const result: DeleteBatchResult = await deleteBatchSafely(deleteId);
       await logActivity('Menghapus batch READY_FOR_QS');
-      toast.success('Batch dihapus');
+      toast.success(result.orphan_cleanup
+        ? `Batch kosong dihapus. ${result.deleted_spk_count} SPK orphan ikut dibersihkan.`
+        : `Batch dihapus. ${result.released_count} Surat Jalan dikembalikan ke Draft.`);
       setDeleteId(null);
       affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       load();
@@ -216,9 +221,21 @@ export default function BatchListPage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setDeleteId(row.original.id)} title="Hapus">
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+          {canAdmin && (() => {
+            const eligibility = canDeleteBatch(row.original);
+            if (!eligibility.allowed && row.original.surat_jalan_count > 0) return null;
+            return (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => eligibility.allowed && setDeleteId(row.original.id)}
+                disabled={!eligibility.allowed}
+                title={eligibility.allowed ? (eligibility.orphanCleanup ? 'Hapus batch kosong' : 'Hapus') : eligibility.reason}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            );
+          })()}
         </div>
       ),
     },
@@ -279,7 +296,12 @@ export default function BatchListPage() {
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
         title="Hapus Batch?"
-        description="Hanya batch READY_FOR_QS tanpa SPK yang dapat dihapus. Surat Jalan akan dikembalikan ke Draft."
+        description={(() => {
+          const batch = rows.find((row) => row.id === deleteId);
+          const eligibility = batch ? canDeleteBatch(batch) : null;
+          if (eligibility?.orphanCleanup) return 'Hapus batch kosong? SPK orphan yang masih terkait juga akan dihapus. Tindakan ini hanya digunakan untuk membersihkan data yang tidak konsisten.';
+          return 'Hapus batch? Surat Jalan dalam batch akan dikembalikan ke Draft.';
+        })()}
         onConfirm={confirmDelete}
       />
     </div>
