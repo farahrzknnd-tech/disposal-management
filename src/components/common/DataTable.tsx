@@ -78,35 +78,50 @@ export function DataTable<T>({
         {toolbar}
       </div>
       <div className="rounded-md border">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="relative overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+          <table className="w-full min-w-max text-sm">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b bg-muted/50">
-                  {headerGroup.headers.map((header) => (
+                  {headerGroup.headers.map((header) => {
+                    const isActionsColumn = header.column.id === "actions";
+                    return (
                     <th
                       key={header.id}
                       className={cn(
                         "h-10 px-3 text-left font-medium text-muted-foreground whitespace-nowrap",
-                        header.column.getCanSort() && "cursor-pointer select-none hover:bg-muted"
+                        header.column.getCanSort() && "cursor-pointer select-none hover:bg-muted",
+                        isActionsColumn &&
+                          "sticky right-0 z-20 border-l bg-muted/95 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)] backdrop-blur-sm"
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
-                  ))}
+                    );
+                  })}
                 </tr>
               ))}
             </thead>
             <tbody>
               {rows.length > 0 ? (
                 rows.map((row) => (
-                  <tr key={row.id} className="border-b transition-colors hover:bg-muted/30">
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-3 py-2.5 whitespace-nowrap">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
+                  <tr key={row.id} className="group border-b transition-colors hover:bg-muted/30">
+                    {row.getVisibleCells().map((cell) => {
+                      const isActionsColumn = cell.column.id === "actions";
+                      return (
+                        <td
+                          key={cell.id}
+                          className={cn(
+                            "px-3 py-2.5 whitespace-nowrap",
+                            isActionsColumn &&
+                              "sticky right-0 z-10 border-l bg-background shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)] group-hover:bg-muted/30"
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))
               ) : (

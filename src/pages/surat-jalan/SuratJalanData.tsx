@@ -316,12 +316,18 @@ export default function SuratJalanData() {
       enableSorting: false,
       size: 90,
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
+        <div className="relative z-20 flex items-center gap-1">
           <Button
+            type="button"
             variant="ghost"
             size="icon"
-            onClick={() => navigate(`/surat-jalan/input?id=${row.original.id}`)}
+            className="h-11 w-11 touch-manipulation sm:h-9 sm:w-9"
+            onClick={(event) => {
+              event.stopPropagation();
+              navigate(`/surat-jalan/input?id=${row.original.id}`);
+            }}
             title="Edit"
+            aria-label="Edit Surat Jalan"
           >
             <Pencil className="h-4 w-4" />
           </Button>
@@ -329,11 +335,17 @@ export default function SuratJalanData() {
             const eligibility = canDeleteSuratJalan(row.original);
             return (
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => eligibility.allowed && setDeleteId(row.original.id)}
+                className="h-11 w-11 touch-manipulation sm:h-9 sm:w-9"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (eligibility.allowed) setDeleteId(row.original.id);
+                }}
                 disabled={!eligibility.allowed}
                 title={eligibility.allowed ? 'Hapus' : eligibility.reason}
+                aria-label={eligibility.allowed ? 'Hapus Surat Jalan' : eligibility.reason}
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>

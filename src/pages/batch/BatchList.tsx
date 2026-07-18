@@ -196,27 +196,35 @@ export default function BatchListPage() {
       enableSorting: false,
       size: 260,
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
+        <div className="relative z-20 flex items-center gap-1">
           {isStatus(row.original.status, 'READY_FOR_QS') && (
             <Button
+              type="button"
               variant="outline"
               size="sm"
-              onClick={() => handleSendToQs(row.original)}
-              className="gap-1"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleSendToQs(row.original);
+              }}
+              className="min-h-11 touch-manipulation gap-1 sm:min-h-8"
             >
               <Send className="h-3.5 w-3.5" /> Kirim ke QS
             </Button>
           )}
           {(isStatus(row.original.status, 'IN_QS_REVIEW') || isStatus(row.original.status, 'SPK_ISSUED')) && row.original.spk_count < row.original.cluster_count && (
             <Button
+              type="button"
               size="sm"
-              onClick={() => navigate(`/batch/${row.original.id}?action=spk`)}
-              className="gap-1"
+              onClick={(event) => {
+                event.stopPropagation();
+                navigate(`/batch/${row.original.id}?action=spk`);
+              }}
+              className="min-h-11 touch-manipulation gap-1 sm:min-h-8"
             >
               <FileSignature className="h-3.5 w-3.5" /> Terbit SPK
             </Button>
           )}
-          <Button asChild variant="ghost" size="icon" title="Detail">
+          <Button asChild variant="ghost" size="icon" className="h-11 w-11 touch-manipulation sm:h-9 sm:w-9" title="Detail">
             <Link to={`/batch/${row.original.id}`}>
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -226,11 +234,17 @@ export default function BatchListPage() {
             if (!eligibility.allowed && row.original.surat_jalan_count > 0) return null;
             return (
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => eligibility.allowed && setDeleteId(row.original.id)}
+                className="h-11 w-11 touch-manipulation sm:h-9 sm:w-9"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (eligibility.allowed) setDeleteId(row.original.id);
+                }}
                 disabled={!eligibility.allowed}
                 title={eligibility.allowed ? (eligibility.orphanCleanup ? 'Hapus batch kosong' : 'Hapus') : eligibility.reason}
+                aria-label={eligibility.allowed ? (eligibility.orphanCleanup ? 'Hapus batch kosong' : 'Hapus batch') : eligibility.reason}
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
