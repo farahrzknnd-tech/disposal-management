@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ScrollText, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { supabase, logActivity } from '@/lib/supabase';
@@ -13,10 +14,12 @@ import { formatRupiah, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { isStatus } from '@/lib/status';
 import { completeSpkWorkflow, getWorkflowErrorMessage } from '@/lib/workflows';
+import { affectedWorkflowQueries } from '@/lib/queryKeys';
 
 export default function TagihanListPage() {
   const [rows, setRows] = useState<SpkWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +51,7 @@ export default function TagihanListPage() {
       await completeSpkWorkflow({ spkId: id });
       await logActivity('Menandai SPK selesai');
       toast.success('SPK ditandai selesai');
+      affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       load();
     } catch (error) {
       toast.error('Gagal menandai selesai', { description: getWorkflowErrorMessage(error) });

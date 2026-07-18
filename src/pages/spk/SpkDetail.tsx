@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Download, Printer, FileSpreadsheet, CheckCircle2,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/
 import { toast } from 'sonner';
 import { completeSpkWorkflow, getWorkflowErrorMessage, submitSpkInvoice } from '@/lib/workflows';
 import { isStatus } from '@/lib/status';
+import { affectedWorkflowQueries } from '@/lib/queryKeys';
 
 interface DetailData {
   spk: Spk | null;
@@ -31,6 +33,7 @@ interface DetailData {
 export default function SpkDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -115,6 +118,7 @@ export default function SpkDetailPage() {
       });
       await logActivity(`Menyimpan tagihan ${nomorTagihan} untuk SPK ${data.spk?.nomor_spk}`);
       toast.success('Tagihan disimpan. Status SPK: Ditagihkan');
+      affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       load();
     } catch (error) {
       toast.error('Gagal menyimpan tagihan', { description: getWorkflowErrorMessage(error) });
@@ -130,6 +134,7 @@ export default function SpkDetailPage() {
       await completeSpkWorkflow({ spkId: id });
       await logActivity(`SPK ${data.spk.nomor_spk} ditandai selesai`);
       toast.success('SPK ditandai selesai');
+      affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       load();
     } catch (error) {
       toast.error('Gagal menandai selesai', { description: getWorkflowErrorMessage(error) });

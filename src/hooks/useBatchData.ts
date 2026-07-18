@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Batch, MasterCluster, Spk, SuratJalan } from '@/lib/types';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface BatchWithStats extends Batch {
   surat_jalan_count: number;
@@ -19,7 +20,7 @@ export interface BatchDetailData {
 
 export function useBatches() {
   return useQuery<BatchWithStats[]>({
-    queryKey: ['batch', 'with_stats'],
+    queryKey: queryKeys.batches,
     queryFn: async () => {
       const { data: batches } = await supabase
         .from('batch')
@@ -58,7 +59,7 @@ export function useBatches() {
 
 export function useBatchDetail(id: string | undefined) {
   return useQuery<BatchDetailData>({
-    queryKey: ['batch', 'detail', id],
+    queryKey: queryKeys.batchDetail(id),
     enabled: !!id,
     queryFn: async () => {
       if (!id) return { batch: null, suratJalan: [], spks: [], clusters: [] };

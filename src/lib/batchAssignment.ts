@@ -7,7 +7,7 @@ export function assertValidAssignResult(result: AssignBatchResult, requestedCoun
 }
 
 export function formatAssignSuccess(result: AssignBatchResult): string {
-  return result.batches.map((batch) => `${batch.assigned_count} ke ${batch.nama_batch}`).join("\n");
+  return `${result.assigned_count} ke ${result.nama_batch}`;
 }
 
 export function shouldClearAssignSelection(result: AssignBatchResult, requestedCount: number): boolean {

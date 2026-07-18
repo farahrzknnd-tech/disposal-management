@@ -1,7 +1,11 @@
-import { assignSuratJalanToAutoBatches, sendBatchToQsRpc, type AssignBatchResult } from "./workflows";
+import { assignSuratJalanToBatch, createBatchAndAssignSuratJalan, sendBatchToQsRpc, type AssignBatchResult } from "./workflows";
 
-export async function assignSuratJalanToAutoBatch(sjIds: string[]): Promise<AssignBatchResult> {
-  return assignSuratJalanToAutoBatches(sjIds);
+export async function assignSuratJalanToExistingBatch(batchId: string, sjIds: string[]): Promise<AssignBatchResult> {
+  return assignSuratJalanToBatch(batchId, sjIds);
+}
+
+export async function createBatchAndAssign(args: { bulanBatch: string; urutanBatch: 1 | 2; tanggalDiterima: string; catatan?: string | null; suratJalanIds: string[] }): Promise<AssignBatchResult> {
+  return createBatchAndAssignSuratJalan(args);
 }
 
 export async function sendBatchToQs(batchId: string) {

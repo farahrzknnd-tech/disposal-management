@@ -24,6 +24,9 @@ export interface MasterVendor {
 export interface Batch {
   id: string;
   nama_batch: string;
+  bulan_batch: string | null;
+  urutan_batch: number | null;
+  tanggal_diterima: string | null;
   periode_awal: string | null;
   periode_akhir: string | null;
   tanggal_kirim_qs: string | null;

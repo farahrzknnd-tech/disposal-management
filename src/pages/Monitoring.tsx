@@ -9,9 +9,10 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { TableSkeleton } from "@/components/common/TableSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { Batch, SuratJalan, Spk } from "@/lib/types";
-import { useBatchs, useSuratJalan, useSpks, useClusters } from "@/hooks/useGlobalData";
+import { useBatchs, useSuratJalan, useSpks } from "@/hooks/useGlobalData";
 import { formatRupiah } from "@/lib/format";
-import { computeBatchStatus } from "@/lib/batchStatus";
+import { completedSpkCount, expectedClusterCount, monitoringProgress, outstandingAmount } from "@/lib/monitoring";
+import { statusLabel, WORKFLOW_STATUSES } from "@/lib/status";
 
 interface BatchMonitoringRow extends Batch {
   sjCount: number;
@@ -20,34 +21,33 @@ interface BatchMonitoringRow extends Batch {
   outstandingAmount: number;
   progressPercentage: number;
   computedStatus: string;
+  expectedSpkCount: number;
 }
 
 export default function Monitoring() {
   const { data: batchs = [], isLoading } = useBatchs();
   const { data: sjs = [] } = useSuratJalan();
   const { data: spks = [] } = useSpks();
-  const { data: clusters = [] } = useClusters();
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const monitoringData = useMemo<BatchMonitoringRow[]>(() => {
     return batchs.map((batch) => {
       const batchSjs = sjs.filter((sj: SuratJalan) => sj.batch_id === batch.id);
       const batchSpks = spks.filter((spk: Spk) => spk.batch_id === batch.id);
-      const completedSpks = batchSpks.filter((spk: Spk) => spk.status === "Selesai");
-      const outstandingAmount = batchSpks.reduce((sum, spk: Spk) => sum + ((spk.nominal_tagihan ?? spk.nominal_spk ?? 0) - 0), 0);
-      const progressPercentage = batchSpks.length > 0 ? Math.round((completedSpks.length / batchSpks.length) * 100) : 0;
-      const computedStatus = computeBatchStatus(clusters.length, batchSpks, !!batch.tanggal_kirim_qs);
+      const expectedSpkCount = expectedClusterCount(batchSjs);
+      const completedCount = completedSpkCount(batchSpks);
       return {
         ...batch,
         sjCount: batchSjs.length,
         spkCount: batchSpks.length,
-        spkCompletedCount: completedSpks.length,
-        outstandingAmount,
-        progressPercentage,
-        computedStatus,
+        spkCompletedCount: completedCount,
+        outstandingAmount: outstandingAmount(batchSpks),
+        progressPercentage: monitoringProgress(batchSjs, batchSpks),
+        computedStatus: batch.status,
+        expectedSpkCount,
       };
     });
-  }, [batchs, sjs, spks, clusters]);
+  }, [batchs, sjs, spks]);
 
   const filteredData = statusFilter === "all"
     ? monitoringData
@@ -78,7 +78,7 @@ export default function Monitoring() {
     },
     { accessorKey: "sjCount", header: "SJ Count", cell: ({ row }) => <div className="text-right">{row.original.sjCount}</div> },
     { accessorKey: "spkCount", header: "SPK Count", cell: ({ row }) => <div className="text-right">{row.original.spkCount}</div> },
-    { id: "spkCompleted", header: "SPK Selesai", cell: ({ row }) => <div className="text-right">{row.original.spkCompletedCount}/{row.original.spkCount}</div> },
+    { id: "spkCompleted", header: "SPK Selesai", cell: ({ row }) => <div className="text-right">{row.original.spkCompletedCount}/{row.original.expectedSpkCount}</div> },
     { accessorKey: "outstandingAmount", header: "Outstanding", cell: ({ row }) => <div className="text-right font-medium text-red-600">{formatRupiah(row.original.outstandingAmount)}</div> },
   ];
 
@@ -87,11 +87,9 @@ export default function Monitoring() {
       <SelectTrigger className="w-40"><SelectValue placeholder="Filter Status" /></SelectTrigger>
       <SelectContent>
         <SelectItem value="all">Semua Status</SelectItem>
-        <SelectItem value="Draft">Draft</SelectItem>
-        <SelectItem value="Dikirim ke QS">Dikirim ke QS</SelectItem>
-        <SelectItem value="SPK Terbit">SPK Terbit</SelectItem>
-        <SelectItem value="Tagihan Diserahkan">Tagihan Diserahkan</SelectItem>
-        <SelectItem value="Selesai">Selesai</SelectItem>
+        {WORKFLOW_STATUSES.map((status) => (
+          <SelectItem key={status} value={status}>{statusLabel(status)}</SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
@@ -113,7 +111,7 @@ export default function Monitoring() {
         <Card><CardContent className="p-4"><div className="text-sm text-muted-foreground mb-1">Total Batch</div><div className="text-2xl font-bold">{totalBatch}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-muted-foreground mb-1">Total SJ</div><div className="text-2xl font-bold">{totalSj}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-muted-foreground mb-1">Total SPK</div><div className="text-2xl font-bold">{totalSpk}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-sm text-muted-foreground mb-1">Total Selesai</div><div className="text-2xl font-bold text-green-600">{totalCompleted}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-sm text-muted-foreground mb-1">SPK Selesai</div><div className="text-2xl font-bold text-green-600">{totalCompleted}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="text-sm text-muted-foreground mb-1">Total Outstanding</div><div className="text-xl font-bold text-red-600">{formatRupiah(totalOutstanding)}</div></CardContent></Card>
       </div>
 

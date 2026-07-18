@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ArrowRight, Trash2, Send, FileSignature, Download, FileText, Printer } from 'lucide-react';
 import { supabase, logActivity } from '@/lib/supabase';
@@ -22,7 +23,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { isStatus } from '@/lib/status';
-import { getWorkflowErrorMessage } from '@/lib/workflows';
+import { deleteReadyBatch, getWorkflowErrorMessage } from '@/lib/workflows';
+import { affectedWorkflowQueries } from '@/lib/queryKeys';
 
 interface BatchRow extends Batch {
   surat_jalan_count: number;
@@ -35,6 +37,7 @@ interface BatchRow extends Batch {
 
 export default function BatchListPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<BatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -93,13 +96,16 @@ export default function BatchListPage() {
 
   async function confirmDelete() {
     if (!deleteId) return;
-    await supabase.from('surat_jalan').update({ batch_id: null, spk_id: null }).eq('batch_id', deleteId);
-    const { error } = await supabase.from('batch').delete().eq('id', deleteId);
-    if (error) return toast.error('Gagal menghapus batch');
-    await logActivity('Menghapus batch');
-    toast.success('Batch dihapus');
-    setDeleteId(null);
-    load();
+    try {
+      await deleteReadyBatch(deleteId);
+      await logActivity('Menghapus batch READY_FOR_QS');
+      toast.success('Batch dihapus');
+      setDeleteId(null);
+      affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
+      load();
+    } catch (error) {
+      toast.error('Gagal menghapus batch', { description: getWorkflowErrorMessage(error) });
+    }
   }
 
   async function handleSendToQs(batch: BatchRow) {
@@ -107,6 +113,7 @@ export default function BatchListPage() {
       await sendBatchToQs(batch.id);
       await logActivity(`Mengirim batch "${batch.nama_batch}" ke QS`);
       toast.success('Batch dikirim ke QS');
+      affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       load();
     } catch (error) {
       toast.error('Gagal mengirim batch ke QS', { description: getWorkflowErrorMessage(error) });
@@ -116,7 +123,8 @@ export default function BatchListPage() {
   function handleExport(format: 'excel' | 'pdf' | 'print') {
     const columns: ExportColumn<BatchRow>[] = [
       { header: 'Nama Batch', accessor: (r) => r.nama_batch },
-      { header: 'Periode', accessor: (r) => `${formatDate(r.periode_awal)} - ${formatDate(r.periode_akhir)}` },
+      { header: 'Tanggal Diterima', accessor: (r) => formatDate(r.tanggal_diterima) },
+      { header: 'Cakupan Tanggal Surat Jalan', accessor: (r) => `${formatDate(r.periode_awal)} - ${formatDate(r.periode_akhir)}` },
       { header: 'Total SJ', accessor: (r) => r.surat_jalan_count },
       { header: 'Pickup', accessor: (r) => r.total_pickup },
       { header: 'Dump Truck', accessor: (r) => r.total_dam_truck },
@@ -140,12 +148,17 @@ export default function BatchListPage() {
     },
     {
       id: 'periode',
-      header: 'Period',
+      header: 'Cakupan Tanggal Surat Jalan',
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
           {formatDate(row.original.periode_awal)} - {formatDate(row.original.periode_akhir)}
         </span>
       ),
+    },
+    {
+      accessorKey: 'tanggal_diterima',
+      header: 'Tanggal Diterima',
+      cell: ({ row }) => formatDate(row.original.tanggal_diterima),
     },
     {
       accessorKey: 'surat_jalan_count',
@@ -215,7 +228,7 @@ export default function BatchListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Batch Pengiriman"
-        description="Pusat administrasi batch. Batch dibuat otomatis berdasarkan periode (1-15 = I, 16-akhir bulan = II)."
+        description="Satu batch mewakili satu kali penyerahan kumpulan Surat Jalan dari Sabilillah untuk dikirim bersama ke QS."
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -266,7 +279,7 @@ export default function BatchListPage() {
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
         title="Hapus Batch?"
-        description="Surat jalan pada batch ini akan dilepas dari batch. Batch akan dihapus permanen."
+        description="Hanya batch READY_FOR_QS tanpa SPK yang dapat dihapus. Surat Jalan akan dikembalikan ke Draft."
         onConfirm={confirmDelete}
       />
     </div>

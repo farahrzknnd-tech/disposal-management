@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Batch, MasterCluster, Spk, SpkWithRelations, SuratJalan } from '@/lib/types';
+import { queryKeys } from '@/lib/queryKeys';
 
 export interface SpkDetailData {
   spk: Spk | null;
@@ -11,7 +12,7 @@ export interface SpkDetailData {
 
 export function useSpkList() {
   return useQuery<SpkWithRelations[]>({
-    queryKey: ['spk', 'list'],
+    queryKey: queryKeys.spks,
     queryFn: async () => {
       const { data } = await supabase
         .from('spk')
@@ -24,7 +25,7 @@ export function useSpkList() {
 
 export function useSpkDetail(id: string | undefined) {
   return useQuery<SpkDetailData>({
-    queryKey: ['spk', 'detail', id],
+    queryKey: queryKeys.spkDetail(id),
     enabled: !!id,
     queryFn: async () => {
       if (!id) return { spk: null, batch: null, cluster: null, suratJalan: [] };

@@ -20,6 +20,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -34,11 +36,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/export';
-import { assignSuratJalanToAutoBatch } from '@/lib/batchService';
+import { assignSuratJalanToExistingBatch, createBatchAndAssign } from '@/lib/batchService';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { getWorkflowErrorMessage, type AssignBatchResult } from '@/lib/workflows';
 import { assertValidAssignResult, formatAssignSuccess } from '@/lib/batchAssignment';
+import { affectedWorkflowQueries, queryKeys } from '@/lib/queryKeys';
+import { duplicateOperationalBatchExists, jakartaDate, monthStart, operationalBatchName } from '@/lib/batchDomain';
+import { isStatus } from '@/lib/status';
+import { StatusBadge } from '@/components/common/StatusBadge';
 
 type SJRow = SuratJalanWithRelations & {
   batchLabel: string;
@@ -54,9 +60,17 @@ export default function SuratJalanData() {
   const [filterVendor, setFilterVendor] = useState<string>('all');
   const [filterTanggal, setFilterTanggal] = useState<string>('');
   const [filterBatch, setFilterBatch] = useState<string>('all');
+  const today = jakartaDate();
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignMode, setAssignMode] = useState<'existing' | 'new'>('existing');
+  const [targetBatchId, setTargetBatchId] = useState('');
+  const [bulanBatch, setBulanBatch] = useState(monthStart(today));
+  const [urutanBatch, setUrutanBatch] = useState<1 | 2>(1);
+  const [tanggalDiterima, setTanggalDiterima] = useState(today);
+  const [batchCatatan, setBatchCatatan] = useState('');
 
   const { data: rows = [], isLoading } = useQuery<SuratJalanWithRelations[]>({
-    queryKey: ['surat_jalan'],
+    queryKey: queryKeys.suratJalan,
     queryFn: async () => {
       const { data } = await supabase
         .from('surat_jalan')
@@ -69,7 +83,7 @@ export default function SuratJalanData() {
   });
 
   const { data: batches = [] } = useQuery<Batch[]>({
-    queryKey: ['batch'],
+    queryKey: queryKeys.batches,
     queryFn: async () => {
       const { data } = await supabase.from('batch').select('*');
       return (data as Batch[]) ?? [];
@@ -77,7 +91,7 @@ export default function SuratJalanData() {
   });
 
   const { data: clusters = [] } = useQuery<MasterCluster[]>({
-    queryKey: ['master_cluster'],
+    queryKey: queryKeys.clusters,
     queryFn: async () => {
       const { data } = await supabase.from('master_cluster').select('*');
       return (data as MasterCluster[]) ?? [];
@@ -85,7 +99,7 @@ export default function SuratJalanData() {
   });
 
   const { data: vendors = [] } = useQuery<MasterVendor[]>({
-    queryKey: ['master_vendor'],
+    queryKey: queryKeys.vendors,
     queryFn: async () => {
       const { data } = await supabase.from('master_vendor').select('*');
       return (data as MasterVendor[]) ?? [];
@@ -124,6 +138,21 @@ export default function SuratJalanData() {
     [rows, selectedIds]
   );
 
+  const eligibleBatches = useMemo(() => batches.filter((batch) => isStatus(batch.status, 'READY_FOR_QS')), [batches]);
+  const batchCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    rows.forEach((row) => {
+      if (row.batch_id) counts[row.batch_id] = (counts[row.batch_id] ?? 0) + 1;
+    });
+    return counts;
+  }, [rows]);
+  const batchNamePreview = operationalBatchName(bulanBatch, urutanBatch);
+  const duplicateNewBatch = duplicateOperationalBatchExists(batches, bulanBatch, urutanBatch);
+
+  function invalidateWorkflowQueries() {
+    affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
+  }
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('surat_jalan').delete().eq('id', id);
@@ -133,26 +162,25 @@ export default function SuratJalanData() {
     onSuccess: () => {
       toast.success('Surat jalan dihapus');
       setDeleteId(null);
-      queryClient.invalidateQueries({ queryKey: ['surat_jalan'] });
-      queryClient.invalidateQueries({ queryKey: ['batch'] });
+      invalidateWorkflowQueries();
     },
     onError: (err) => toast.error('Gagal menghapus: ' + err.message),
   });
 
   const assignBatchMutation = useMutation<AssignBatchResult, Error, string[]>({
     mutationFn: async (ids: string[]) => {
-      const result = await assignSuratJalanToAutoBatch(ids);
+      const result = assignMode === 'existing'
+        ? await assignSuratJalanToExistingBatch(targetBatchId, ids)
+        : await createBatchAndAssign({ bulanBatch, urutanBatch, tanggalDiterima, catatan: batchCatatan || null, suratJalanIds: ids });
       assertValidAssignResult(result, ids.length);
       await logActivity(`Menempatkan ${result.assigned_count} surat jalan ke batch otomatis`);
       return result;
     },
     onSuccess: (result) => {
-      toast.success(`${result.assigned_count} Surat Jalan berhasil dimasukkan`, {
-        description: formatAssignSuccess(result),
-      });
+      toast.success(`${result.assigned_count} Surat Jalan berhasil dimasukkan ke ${result.nama_batch}.`, { description: formatAssignSuccess(result) });
       setSelected({});
-      queryClient.invalidateQueries({ queryKey: ['surat_jalan'] });
-      queryClient.invalidateQueries({ queryKey: ['batch'] });
+      setAssignOpen(false);
+      invalidateWorkflowQueries();
     },
     onError: (err) => toast.error('Gagal memasukkan ke batch', { description: getWorkflowErrorMessage(err) }),
   });
@@ -166,8 +194,7 @@ export default function SuratJalanData() {
     onSuccess: () => {
       toast.success('Surat jalan dihapus');
       setSelected({});
-      queryClient.invalidateQueries({ queryKey: ['surat_jalan'] });
-      queryClient.invalidateQueries({ queryKey: ['batch'] });
+      invalidateWorkflowQueries();
     },
     onError: (err) => toast.error('Gagal menghapus: ' + err.message),
   });
@@ -181,6 +208,7 @@ export default function SuratJalanData() {
     { header: 'Jenis Kendaraan', accessor: (r) => r.jenis_kendaraan ?? '-' },
     { header: 'Harga', accessor: (r) => formatRupiah(r.harga) },
     { header: 'Batch', accessor: (r) => r.batchLabel },
+    { header: 'Status', accessor: (r) => r.status },
   ];
 
   const columns: ColumnDef<SJRow>[] = [
@@ -269,6 +297,11 @@ export default function SuratJalanData() {
         ) : (
           <span className="text-xs text-muted-foreground">Belum Masuk Batch</span>
         ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
       id: 'actions',
@@ -421,7 +454,7 @@ export default function SuratJalanData() {
               </Button>
               {canWrite && (
                 <Button
-                  onClick={() => assignBatchMutation.mutate(selectedIds)}
+                  onClick={() => setAssignOpen(true)}
                   disabled={assignBatchMutation.isPending}
                 >
                   <Layers className="mr-2 h-4 w-4" /> {assignBatchMutation.isPending ? 'Assign...' : 'Assign ke Batch'}
@@ -454,6 +487,76 @@ export default function SuratJalanData() {
         description="Surat jalan akan dihapus permanen."
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
+
+      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign ke Batch</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button variant={assignMode === 'existing' ? 'default' : 'outline'} onClick={() => setAssignMode('existing')}>Pilih Batch Tersedia</Button>
+              <Button variant={assignMode === 'new' ? 'default' : 'outline'} onClick={() => setAssignMode('new')}>Buat Batch Baru</Button>
+            </div>
+
+            {assignMode === 'existing' ? (
+              <div className="space-y-2">
+                <Label>Batch READY_FOR_QS</Label>
+                <Select value={targetBatchId} onValueChange={setTargetBatchId}>
+                  <SelectTrigger><SelectValue placeholder="Pilih batch" /></SelectTrigger>
+                  <SelectContent>
+                    {eligibleBatches.map((batch) => (
+                      <SelectItem key={batch.id} value={batch.id}>
+                        {batch.nama_batch} • Diterima: {formatDate(batch.tanggal_diterima)} • {batchCounts[batch.id] ?? 0} SJ • Cakupan: {formatDate(batch.periode_awal)} – {formatDate(batch.periode_akhir)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Bulan Batch</Label>
+                  <Input type="month" value={bulanBatch.slice(0, 7)} onChange={(e) => setBulanBatch(`${e.target.value}-01`)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Urutan Batch</Label>
+                  <Select value={String(urutanBatch)} onValueChange={(v) => setUrutanBatch(Number(v) as 1 | 2)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="1">I</SelectItem><SelectItem value="2">II</SelectItem></SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tanggal Diterima</Label>
+                  <Input type="date" value={tanggalDiterima} onChange={(e) => setTanggalDiterima(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Preview</Label>
+                  <div className="rounded-md border px-3 py-2 text-sm font-medium">{batchNamePreview}</div>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Catatan</Label>
+                  <Textarea value={batchCatatan} onChange={(e) => setBatchCatatan(e.target.value)} placeholder="Opsional" />
+                </div>
+                {duplicateNewBatch && <p className="text-sm text-destructive sm:col-span-2">Batch bulan dan urutan tersebut sudah ada.</p>}
+              </div>
+            )}
+
+            <div className="rounded-md bg-muted p-3 text-sm">
+              {selectedIds.length} Surat Jalan akan dimasukkan ke batch. Surat Jalan yang sudah masuk batch tidak dapat dipindahkan.
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setAssignOpen(false)}>Batal</Button>
+              <Button
+                onClick={() => assignBatchMutation.mutate(selectedIds)}
+                disabled={assignBatchMutation.isPending || (assignMode === 'existing' && !targetBatchId) || (assignMode === 'new' && duplicateNewBatch)}
+              >
+                {assignBatchMutation.isPending ? 'Menyimpan...' : 'Assign'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

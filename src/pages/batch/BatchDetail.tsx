@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Send, FileSignature, Download, FileText, Printer, X,
 } from 'lucide-react';
@@ -25,11 +26,12 @@ import {
 import { formatDate, formatRupiah } from '@/lib/format';
 import { hitungEstimasi } from '@/lib/constants';
 import { sendBatchToQs } from '@/lib/batchService';
-import { computeSpkStatus, computeSJProgress } from '@/lib/batchStatus';
+import { computeSpkStatus } from '@/lib/batchStatus';
 import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/export';
 import { toast } from 'sonner';
 import { isStatus } from '@/lib/status';
 import { getWorkflowErrorMessage, issueSpkForBatchCluster } from '@/lib/workflows';
+import { affectedWorkflowQueries } from '@/lib/queryKeys';
 
 interface DetailData {
   batch: Batch | null;
@@ -41,6 +43,7 @@ interface DetailData {
 export default function BatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +90,7 @@ export default function BatchDetailPage() {
       await sendBatchToQs(data.batch.id);
       await logActivity(`Mengirim batch "${data.batch.nama_batch}" ke QS`);
       toast.success('Batch dikirim ke QS');
+      affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       load();
     } catch (error) {
       toast.error('Gagal mengirim ke QS', { description: getWorkflowErrorMessage(error) });
@@ -113,7 +117,6 @@ export default function BatchDetailPage() {
   const totalPickup = data.suratJalan.reduce((a, s) => a + (s.pickup ?? 0), 0);
   const totalDamTruck = data.suratJalan.reduce((a, s) => a + (s.dam_truck ?? 0), 0);
   const estimasi = hitungEstimasi(totalPickup, totalDamTruck);
-  const sentToQs = isStatus(batch.status, 'IN_QS_REVIEW') || isStatus(batch.status, 'SPK_ISSUED') || isStatus(batch.status, 'INVOICED') || isStatus(batch.status, 'COMPLETED');
   const canIssueMoreSpk = (isStatus(batch.status, 'IN_QS_REVIEW') || isStatus(batch.status, 'SPK_ISSUED')) && data.spks.length < clustersInBatch.length;
 
   function handleExport(format: 'excel' | 'pdf' | 'print') {
@@ -136,7 +139,7 @@ export default function BatchDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={batch.nama_batch}
-        description={`Periode: ${formatDate(batch.periode_awal)} - ${formatDate(batch.periode_akhir)}`}
+        description={`Diterima: ${formatDate(batch.tanggal_diterima)} • Cakupan Tanggal Surat Jalan: ${formatDate(batch.periode_awal)} - ${formatDate(batch.periode_akhir)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => navigate('/batch')}>
@@ -167,6 +170,7 @@ export default function BatchDetailPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
+          { label: 'Tanggal Diterima', value: formatDate(batch.tanggal_diterima) },
           { label: 'Total SJ', value: data.suratJalan.length },
           { label: 'Total Pickup', value: totalPickup },
           { label: 'Total Dump Truck', value: totalDamTruck },
@@ -244,9 +248,7 @@ export default function BatchDetailPage() {
                       </div>
 
                       <div className="space-y-2">
-                        {clusterSJs.map((sj) => {
-                          const progress = computeSJProgress(sj, sentToQs, spkStatus);
-                          return (
+                        {clusterSJs.map((sj) => (
                             <div
                               key={sj.id}
                               className="flex items-center justify-between rounded-lg border p-3"
@@ -262,11 +264,10 @@ export default function BatchDetailPage() {
                                   <p className="text-xs text-muted-foreground">Total</p>
                                   <p className="text-sm font-semibold">{formatRupiah(sj.total)}</p>
                                 </div>
-                                <StatusBadge status={progress} />
+                                <StatusBadge status={sj.status} />
                               </div>
                             </div>
-                          );
-                        })}
+                        ))}
                       </div>
 
                       {clusterSpk ? (
@@ -304,6 +305,7 @@ export default function BatchDetailPage() {
         onSaved={() => {
           setShowSpkForm(false);
           setSpkClusterId(null);
+          affectedWorkflowQueries.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
           load();
         }}
       />

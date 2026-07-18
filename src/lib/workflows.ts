@@ -1,9 +1,12 @@
 import { supabase } from "./supabase";
 
 export type AssignBatchResult = {
+  batch_id: string;
+  nama_batch: string;
   requested_count: number;
   assigned_count: number;
-  batches: Array<{ batch_id: string; nama_batch: string; assigned_count: number }>;
+  periode_awal: string | null;
+  periode_akhir: string | null;
 };
 
 export type WorkflowResult = Record<string, unknown>;
@@ -20,8 +23,22 @@ async function callWorkflow<T>(name: string, args: Record<string, unknown>): Pro
   return data as T;
 }
 
-export function assignSuratJalanToAutoBatches(suratJalanIds: string[]): Promise<AssignBatchResult> {
-  return callWorkflow("assign_surat_jalan_to_auto_batches", { p_surat_jalan_ids: suratJalanIds });
+export function assignSuratJalanToBatch(batchId: string, suratJalanIds: string[]): Promise<AssignBatchResult> {
+  return callWorkflow("assign_surat_jalan_to_batch", { p_batch_id: batchId, p_surat_jalan_ids: suratJalanIds });
+}
+
+export function createBatchAndAssignSuratJalan(args: { bulanBatch: string; urutanBatch: 1 | 2; tanggalDiterima: string; catatan?: string | null; suratJalanIds: string[] }): Promise<AssignBatchResult> {
+  return callWorkflow("create_batch_and_assign_surat_jalan", {
+    p_bulan_batch: args.bulanBatch,
+    p_urutan_batch: args.urutanBatch,
+    p_tanggal_diterima: args.tanggalDiterima,
+    p_catatan: args.catatan ?? null,
+    p_surat_jalan_ids: args.suratJalanIds,
+  });
+}
+
+export function deleteReadyBatch(batchId: string): Promise<WorkflowResult> {
+  return callWorkflow("delete_ready_batch", { p_batch_id: batchId });
 }
 
 export function sendBatchToQsRpc(batchId: string): Promise<WorkflowResult> {
