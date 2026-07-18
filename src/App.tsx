@@ -1,5 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { RequireAuth } from "@/components/auth/RequireAuth";
+import { RequireRole } from "@/components/auth/RequireRole";
 import Dashboard from "@/pages/Dashboard";
 import SuratJalanData from "@/pages/surat-jalan/SuratJalanData";
 import SuratJalanForm from "@/pages/surat-jalan/SuratJalanForm";
@@ -16,10 +18,15 @@ import AuditLog from "@/pages/AuditLog";
 import MasterData from "@/pages/MasterData";
 import Pengaturan from "@/pages/Pengaturan";
 import ExportCenter from "@/pages/ExportCenter";
+import Login from "@/pages/Login";
+import Unauthorized from "@/pages/Unauthorized";
+import NotFound from "@/pages/NotFound";
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route element={<RequireAuth />}>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/surat-jalan" element={<SuratJalanData />} />
@@ -34,9 +41,16 @@ export default function App() {
         <Route path="/performance" element={<PerformanceDashboard />} />
         <Route path="/laporan" element={<Laporan />} />
         <Route path="/export" element={<ExportCenter />} />
-        <Route path="/audit-log" element={<AuditLog />} />
-        <Route path="/master-data" element={<MasterData />} />
+        <Route path="/audit-log" element={<RequireRole roles={["ADMIN"]} />}>
+          <Route index element={<AuditLog />} />
+        </Route>
+        <Route path="/master-data" element={<RequireRole roles={["ADMIN"]} />}>
+          <Route index element={<MasterData />} />
+        </Route>
         <Route path="/pengaturan" element={<Pengaturan />} />
+        <Route path="/unauthorized" element={<Unauthorized />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
       </Route>
     </Routes>
   );

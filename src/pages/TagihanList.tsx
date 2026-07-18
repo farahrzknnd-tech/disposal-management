@@ -45,7 +45,7 @@ export default function TagihanListPage() {
     const { error } = await supabase.from('spk').update({ status: 'Selesai' }).eq('id', id);
     if (error) return toast.error('Gagal menandai selesai');
     const { data: allSpk } = await supabase.from('spk').select('status').eq('batch_id', batchId);
-    const allDone = (allSpk ?? []).every((s) => s.status === 'Selesai');
+    const allDone = (allSpk ?? []).every((s: any) => s.status === 'Selesai');
     if (allDone) {
       await supabase.from('batch').update({ status: 'Selesai' }).eq('id', batchId);
       await supabase.from('surat_jalan').update({ status: 'Selesai' }).eq('batch_id', batchId);

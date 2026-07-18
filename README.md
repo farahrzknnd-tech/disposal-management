@@ -1,48 +1,21 @@
 # Disposal Management System
 
-React + Vite app for debris disposal workflow. Data uses Supabase tables from
-`supabase/migrations`.
+Focused MVP for debris/disposal workflow management: master data, Surat Jalan, batch, QS, SPK, tagihan, completion, dashboard, monitoring, reporting, and audit log.
 
-## Requirements
+## Stack
+React 18, TypeScript, Vite, React Router, TanStack React Query, Tailwind CSS, shadcn/ui, Supabase, PostgreSQL, Recharts, jsPDF, XLSX.
 
-- Node.js 18+
-- npm
-- Supabase project, or local Supabase CLI
+## Local Development
+See `docs/LOCAL_SETUP.md`.
 
-## Setup
+## Supabase Setup
+See `docs/SUPABASE_SETUP.md`.
 
-1. Install dependencies:
+## Production Checklist
+See `docs/PRODUCTION_CHECKLIST.md`.
 
-   ```bash
-   npm install
-   ```
-
-2. Create `.env`:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Fill Supabase values in `.env`:
-
-   ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. Apply SQL files in `supabase/migrations` to your Supabase database, ordered
-   by filename.
-
-## Run
-
-```bash
-npm run dev
-```
-
-Open printed local URL, usually `http://localhost:5173`.
-
-## Build Check
-
-```bash
-npm run build
-```
+## Security Notes
+- Frontend uses Supabase anon/publishable key only.
+- RLS and RPC functions are source of truth for authorization.
+- Roles are `ADMIN`, `OPERATOR`, `VIEWER` in `public.profiles`.
+- Do not commit `.env` or service-role keys.

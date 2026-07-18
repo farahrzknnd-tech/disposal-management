@@ -55,13 +55,13 @@ export default function BatchListPage() {
       supabase.from('spk').select('*').in('batch_id', ids),
     ]);
     const sjByBatch: Record<string, SuratJalan[]> = {};
-    (sjRes.data ?? []).forEach((s) => {
+    (sjRes.data ?? []).forEach((s: any) => {
       const sj = s as SuratJalan;
       if (!sj.batch_id) return;
       (sjByBatch[sj.batch_id] ??= []).push(sj);
     });
     const spkByBatch: Record<string, Spk[]> = {};
-    (spkRes.data ?? []).forEach((s) => {
+    (spkRes.data ?? []).forEach((s: any) => {
       const spk = s as Spk;
       (spkByBatch[spk.batch_id] ??= []).push(spk);
     });

@@ -1,0 +1,1 @@
+export default function Unauthorized() { return <div><h1 className="text-2xl font-semibold">Tidak berwenang</h1><p className="text-muted-foreground">Akun tidak punya akses ke halaman ini.</p></div>; }

@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Search, Bell, X } from "lucide-react";
+import { LogOut, Menu, Search, Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -22,6 +23,7 @@ export function Navbar({ onMenuClick }: NavbarProps) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const { user, role, signOut } = useAuth();
 
   const notifications: NotificationItem[] = useMemo(() => [], []);
 
@@ -125,6 +127,13 @@ export function Navbar({ onMenuClick }: NavbarProps) {
           </div>
         </PopoverContent>
       </Popover>
+      <div className="hidden text-right text-xs sm:block">
+        <div className="font-medium">{user?.email}</div>
+        <div className="text-muted-foreground">{role}</div>
+      </div>
+      <Button variant="ghost" size="icon" onClick={signOut} title="Logout">
+        <LogOut className="h-5 w-5" />
+      </Button>
     </header>
   );
 }

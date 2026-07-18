@@ -1,5 +1,6 @@
 import type { Spk, StatusBatch, StatusSJ, StatusSpk } from "./types";
 import { getBatchSegment } from "./constants";
+import { normalizeStatus } from "./status";
 
 /**
  * Compute a Batch status from its SPKs and whether it has been sent to QS.
@@ -10,7 +11,7 @@ export function computeBatchStatus(
   spks: Spk[],
   sentToQs: boolean
 ): StatusBatch {
-  if (spks.length > 0 && spks.every((s) => s.status === "Selesai")) return "Selesai";
+  if (spks.length > 0 && spks.every((s) => normalizeStatus(s.status) === "COMPLETED")) return "Selesai";
   if (sentToQs) return "Proses QS";
   return "Belum Dikirim";
 }
@@ -21,7 +22,7 @@ export function computeBatchStatus(
  */
 export function computeSpkStatus(spk: Spk | null | undefined): StatusSpk {
   if (!spk) return "Draft";
-  if (spk.status === "Selesai") return "Selesai";
+  if (normalizeStatus(spk.status) === "COMPLETED") return "Selesai";
   if (spk.nomor_tagihan) return "Tagihan";
   if (spk.nomor_spk) return "SPK Terbit";
   return "Draft";

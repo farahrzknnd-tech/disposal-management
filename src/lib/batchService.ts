@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { buildBatchName, getBatchPeriod } from "./constants";
 import type { Batch } from "./types";
+import { sendBatchToQsRpc } from "./workflows";
 
 /**
  * Find or create the automatic batch for a given date.
@@ -80,21 +81,14 @@ export async function unassignSuratJalanFromBatch(sjIds: string[]): Promise<void
 }
 
 /**
- * Send a batch to QS: set status to "Proses QS" and store tanggal_kirim_qs.
- * Also update all its Surat Jalan to "Proses QS".
+ * Send a batch to QS through transactional RPC.
  */
 export async function sendBatchToQs(batchId: string): Promise<boolean> {
-  const { error } = await supabase
-    .from("batch")
-    .update({
-      status: "Proses QS",
-      tanggal_kirim_qs: new Date().toISOString().slice(0, 10),
-    })
-    .eq("id", batchId);
-  if (error) return false;
-  await supabase
-    .from("surat_jalan")
-    .update({ status: "Proses QS" })
-    .eq("batch_id", batchId);
-  return true;
+  try {
+    await sendBatchToQsRpc(batchId);
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 }

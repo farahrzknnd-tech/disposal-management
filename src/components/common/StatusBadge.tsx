@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { STATUS_COLORS, STATUS_DOT_COLORS } from "@/lib/constants";
+import { statusLabel } from "@/lib/status";
 
 interface StatusBadgeProps {
   status: string;
@@ -19,7 +20,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       )}
     >
       <span className={cn("h-1.5 w-1.5 rounded-full", dotClass)} />
-      {status}
+      {statusLabel(status)}
     </span>
   );
 }

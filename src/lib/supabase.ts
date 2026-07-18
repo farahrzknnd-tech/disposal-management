@@ -1,14 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
+import { getEnvConfig } from "./env";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+export const envError = (() => {
+  try { getEnvConfig(); return null; } catch (error) { return error as Error; }
+})();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const config = envError ? { supabaseUrl: "https://invalid.supabase.co", supabaseAnonKey: "invalid" } : getEnvConfig();
+
+const typedSupabase = createClient<Database>(config.supabaseUrl, config.supabaseAnonKey, {
   auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
   },
 });
+
+export const supabase: any = typedSupabase;
 
 export { logActivity } from "./api";
