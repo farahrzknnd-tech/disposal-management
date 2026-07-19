@@ -8,7 +8,7 @@ export function AppFooter() {
           <span>Created by</span>
           <Code2 className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           <span className="font-medium text-foreground/80 transition-colors hover:text-primary">
-            Farah Ananda
+            Farah Ananda &copy; 2026. All Rights Reserved.
           </span>
         </p>
       </div>
