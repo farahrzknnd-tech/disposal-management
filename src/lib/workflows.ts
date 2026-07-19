@@ -38,11 +38,11 @@ export function createBatchAndAssignSuratJalan(args: { bulanBatch: string; uruta
 }
 
 export function deleteReadyBatch(batchId: string): Promise<WorkflowResult> {
-  return callWorkflow("delete_ready_batch", { p_batch_id: batchId });
+  return callWorkflow("delete_batch_safely", { p_batch_id: batchId });
 }
 
 export function deleteSuratJalan(suratJalanIds: string[]): Promise<WorkflowResult> {
-  return callWorkflow("delete_surat_jalan", { p_surat_jalan_ids: suratJalanIds });
+  return callWorkflow("delete_surat_jalan_safely", { p_surat_jalan_ids: suratJalanIds });
 }
 
 export function sendBatchToQsRpc(batchId: string): Promise<WorkflowResult> {

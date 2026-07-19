@@ -11,14 +11,7 @@ import type {
 } from "./types";
 
 export async function logActivity(aktivitas: string): Promise<void> {
-  try {
-    await supabase.from("audit_log").insert({
-      aktivitas,
-      user: "Admin Project",
-    });
-  } catch {
-    // silent fail
-  }
+  void aktivitas;
 }
 
 export async function fetchSuratJalan(): Promise<SuratJalan[]> {
