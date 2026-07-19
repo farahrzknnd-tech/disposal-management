@@ -39,13 +39,12 @@ import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/
 import { assignSuratJalanToExistingBatch, createBatchAndAssign } from '@/lib/batchService';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
-import { deleteSuratJalanSafely, getWorkflowErrorMessage, type AssignBatchResult } from '@/lib/workflows';
+import { getWorkflowErrorMessage, type AssignBatchResult } from '@/lib/workflows';
 import { assertValidAssignResult, formatAssignSuccess } from '@/lib/batchAssignment';
 import { affectedWorkflowQueries, queryKeys } from '@/lib/queryKeys';
 import { duplicateOperationalBatchExists, jakartaDate, monthStart, operationalBatchName } from '@/lib/batchDomain';
 import { isStatus } from '@/lib/status';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { canDeleteSuratJalan, ensureBulkSuratJalanDeletable } from '@/lib/deletionRules';
 
 type SJRow = SuratJalanWithRelations & {
   batchLabel: string;
@@ -54,7 +53,7 @@ type SJRow = SuratJalanWithRelations & {
 export default function SuratJalanData() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canAdmin, canWrite } = useAuth();
+  const { canWrite } = useAuth();
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filterCluster, setFilterCluster] = useState<string>('all');
@@ -156,11 +155,8 @@ export default function SuratJalanData() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const row = rows.find((item) => item.id === id);
-      if (!row) throw new Error('Surat Jalan tidak ditemukan.');
-      const eligibility = canDeleteSuratJalan(row);
-      if (!eligibility.allowed) throw new Error(eligibility.reason);
-      await deleteSuratJalanSafely([id]);
+      const { error } = await supabase.from('surat_jalan').delete().eq('id', id);
+      if (error) throw error;
       await logActivity('Menghapus surat jalan');
     },
     onSuccess: () => {
@@ -191,10 +187,8 @@ export default function SuratJalanData() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const selectedRows = rows.filter((row) => ids.includes(row.id));
-      const eligibility = ensureBulkSuratJalanDeletable(selectedRows);
-      if (!eligibility.allowed) throw new Error(eligibility.reason);
-      await deleteSuratJalanSafely(ids);
+      const { error } = await supabase.from('surat_jalan').delete().in('id', ids);
+      if (error) throw error;
       await logActivity(`Menghapus ${ids.length} surat jalan`);
     },
     onSuccess: () => {
@@ -221,12 +215,11 @@ export default function SuratJalanData() {
     {
       id: 'select',
       header: () => {
-        const visibleIds = filtered.filter((r) => canDeleteSuratJalan(r).allowed).map((r) => r.id);
+        const visibleIds = filtered.filter((r) => !r.batch_id).map((r) => r.id);
         const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected[id]);
         return (
           <Checkbox
             checked={allSelected}
-            disabled={!canAdmin}
             onCheckedChange={(v) => {
               const next = { ...selected };
               visibleIds.forEach((id) => {
@@ -241,11 +234,11 @@ export default function SuratJalanData() {
       cell: ({ row }) => (
         <Checkbox
           checked={!!selected[row.original.id]}
-          disabled={!canAdmin || !canDeleteSuratJalan(row.original).allowed}
+          disabled={!canWrite || !!row.original.batch_id}
           onCheckedChange={(v) =>
             setSelected((prev) => {
               const next = { ...prev };
-              if (v && canDeleteSuratJalan(row.original).allowed) next[row.original.id] = true;
+              if (v && !row.original.batch_id) next[row.original.id] = true;
               else delete next[row.original.id];
               return next;
             })
@@ -331,26 +324,20 @@ export default function SuratJalanData() {
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          {canAdmin && (() => {
-            const eligibility = canDeleteSuratJalan(row.original);
-            return (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 touch-manipulation sm:h-9 sm:w-9"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (eligibility.allowed) setDeleteId(row.original.id);
-                }}
-                disabled={!eligibility.allowed}
-                title={eligibility.allowed ? 'Hapus' : eligibility.reason}
-                aria-label={eligibility.allowed ? 'Hapus Surat Jalan' : eligibility.reason}
-              >
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            );
-          })()}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 touch-manipulation sm:h-9 sm:w-9"
+            onClick={(event) => {
+              event.stopPropagation();
+              setDeleteId(row.original.id);
+            }}
+            title="Hapus"
+            aria-label="Hapus Surat Jalan"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
         </div>
       ),
     },
@@ -485,14 +472,13 @@ export default function SuratJalanData() {
                   <Layers className="mr-2 h-4 w-4" /> {assignBatchMutation.isPending ? 'Assign...' : 'Assign ke Batch'}
                 </Button>
               )}
-              {canAdmin && <Button
+              <Button
                 variant="destructive"
                 onClick={() => bulkDeleteMutation.mutate(selectedIds)}
                 disabled={bulkDeleteMutation.isPending}
-                title={ensureBulkSuratJalanDeletable(rows.filter((row) => selectedIds.includes(row.id))).reason || 'Hapus Surat Jalan terpilih'}
               >
                 <Trash2 className="mr-2 h-4 w-4" /> Hapus
-              </Button>}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -510,7 +496,7 @@ export default function SuratJalanData() {
         open={!!deleteId}
         onOpenChange={(o) => !o && setDeleteId(null)}
         title="Hapus Surat Jalan?"
-        description="Hanya Surat Jalan Draft atau yang masih berada di batch Siap Dikirim tanpa SPK yang dapat dihapus."
+        description="Surat jalan akan dihapus permanen."
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
       />
 
