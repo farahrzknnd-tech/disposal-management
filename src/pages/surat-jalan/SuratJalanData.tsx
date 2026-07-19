@@ -39,7 +39,7 @@ import { exportToExcel, exportToPDF, printData, type ExportColumn } from '@/lib/
 import { assignSuratJalanToExistingBatch, createBatchAndAssign } from '@/lib/batchService';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
-import { getWorkflowErrorMessage, type AssignBatchResult } from '@/lib/workflows';
+import { deleteSuratJalan, getWorkflowErrorMessage, type AssignBatchResult } from '@/lib/workflows';
 import { assertValidAssignResult, formatAssignSuccess } from '@/lib/batchAssignment';
 import { affectedWorkflowQueries, queryKeys } from '@/lib/queryKeys';
 import { duplicateOperationalBatchExists, jakartaDate, monthStart, operationalBatchName } from '@/lib/batchDomain';
@@ -155,8 +155,7 @@ export default function SuratJalanData() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('surat_jalan').delete().eq('id', id);
-      if (error) throw error;
+      await deleteSuratJalan([id]);
       await logActivity('Menghapus surat jalan');
     },
     onSuccess: () => {
@@ -187,8 +186,7 @@ export default function SuratJalanData() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const { error } = await supabase.from('surat_jalan').delete().in('id', ids);
-      if (error) throw error;
+      await deleteSuratJalan(ids);
       await logActivity(`Menghapus ${ids.length} surat jalan`);
     },
     onSuccess: () => {

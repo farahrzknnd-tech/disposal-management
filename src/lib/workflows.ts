@@ -41,6 +41,10 @@ export function deleteReadyBatch(batchId: string): Promise<WorkflowResult> {
   return callWorkflow("delete_ready_batch", { p_batch_id: batchId });
 }
 
+export function deleteSuratJalan(suratJalanIds: string[]): Promise<WorkflowResult> {
+  return callWorkflow("delete_surat_jalan", { p_surat_jalan_ids: suratJalanIds });
+}
+
 export function sendBatchToQsRpc(batchId: string): Promise<WorkflowResult> {
   return callWorkflow("send_batch_to_qs", { p_batch_id: batchId });
 }

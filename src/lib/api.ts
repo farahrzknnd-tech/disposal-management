@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { deleteReadyBatch, deleteSuratJalan as deleteSuratJalanRpc } from "./workflows";
 import type {
   AuditLog,
   Batch,
@@ -143,8 +144,7 @@ export async function updateSuratJalan(
 }
 
 export async function deleteSuratJalan(id: string): Promise<void> {
-  const { error } = await supabase.from("surat_jalan").delete().eq("id", id);
-  if (error) throw error;
+  await deleteSuratJalanRpc([id]);
 }
 
 export async function createBatch(
@@ -174,8 +174,7 @@ export async function updateBatch(
 }
 
 export async function deleteBatch(id: string): Promise<void> {
-  const { error } = await supabase.from("batch").delete().eq("id", id);
-  if (error) throw error;
+  await deleteReadyBatch(id);
 }
 
 export async function createSpk(
