@@ -24,3 +24,7 @@ dist-ssr
 *.sln
 *.sw?
 *.tsbuildinfo
+
+# Procurement legacy inventory outputs (may contain remote metadata)
+docs/procurement/inventory-output/*
+!docs/procurement/inventory-output/.gitkeep

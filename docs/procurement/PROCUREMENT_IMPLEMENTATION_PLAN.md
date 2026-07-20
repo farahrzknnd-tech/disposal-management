@@ -353,3 +353,27 @@ Setiap patch melewati gate:
 - production data import: import run ID + mapping + issue log;
 - PO Archive tetap aktif/read-only sebagai fallback;
 - tidak drop legacy source sampai final sign-off.
+
+## Phase 1B — Legacy Remote Schema Inventory
+
+### Goal
+
+Memverifikasi reconstruction terhadap Supabase PO Archive secara read-only.
+
+### Deliverables
+
+- SQL inventory toolkit;
+- remote schema evidence CSV;
+- row-count baseline;
+- data-quality summary;
+- mapping ambiguity list;
+- Patch 2 readiness decision.
+
+### Acceptance criteria
+
+- seluruh query 00–08 dijalankan pada remote legacy;
+- tidak ada mutation;
+- table/column/constraint/RLS evidence lengkap;
+- orphan dan duplicate summary tersedia;
+- unresolved master mapping terdokumentasi;
+- Patch 2 tidak dimulai sebelum review gate lulus.

@@ -30,3 +30,9 @@ Rencana integrasi `po-archive` sebagai modul Procurement tersedia di:
 - `docs/procurement/PROCUREMENT_IMPLEMENTATION_PLAN.md`
 
 Dokumen Phase 1 bersifat perencanaan dan tidak mengubah runtime atau database production.
+
+### Procurement Phase 1B
+
+- [Remote Schema Inventory](docs/procurement/PROCUREMENT_REMOTE_SCHEMA_INVENTORY.md)
+- [Inventory Review Checklist](docs/procurement/PROCUREMENT_INVENTORY_REVIEW_CHECKLIST.md)
+- Read-only SQL toolkit: `scripts/procurement-inventory/`

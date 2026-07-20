@@ -359,3 +359,27 @@ Belum dapat dikunci hanya dari ZIP:
 9. jumlah data production yang harus dipindahkan.
 
 Item tersebut wajib dijawab oleh Phase 1B read-only remote schema export sebelum Patch Database Foundation.
+
+## 13. Phase 1B Remote Verification
+
+Reconstruction pada dokumen ini berasal dari source code dan migration parsial. Remote verification harus dilakukan menggunakan toolkit:
+
+```text
+scripts/procurement-inventory/
+```
+
+Hasil remote mempunyai prioritas lebih tinggi daripada interface TypeScript bila ditemukan perbedaan.
+
+Aturan resolusi:
+
+1. remote database adalah evidence kondisi legacy aktual;
+2. source code menjelaskan cara data digunakan;
+3. migration parsial menjelaskan evolusi schema;
+4. target schema tetap dirancang ulang mengikuti keamanan host, bukan menyalin remote;
+5. perbedaan wajib dicatat sebelum Patch 2 dibuat.
+
+Decision gate dan evidence matrix tersedia di:
+
+```text
+docs/procurement/PROCUREMENT_REMOTE_SCHEMA_INVENTORY.md
+```
