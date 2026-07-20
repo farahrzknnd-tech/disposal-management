@@ -19,3 +19,14 @@ See `docs/PRODUCTION_CHECKLIST.md`.
 - RLS and RPC functions are source of truth for authorization.
 - Roles are `ADMIN`, `OPERATOR`, `VIEWER` in `public.profiles`.
 - Do not commit `.env` or service-role keys.
+
+## Procurement Integration Planning
+
+Rencana integrasi `po-archive` sebagai modul Procurement tersedia di:
+
+- `docs/procurement/PROCUREMENT_INTEGRATION_BLUEPRINT.md`
+- `docs/procurement/PROCUREMENT_SCHEMA_RECONSTRUCTION.md`
+- `docs/procurement/PROCUREMENT_SOURCE_INVENTORY.md`
+- `docs/procurement/PROCUREMENT_IMPLEMENTATION_PLAN.md`
+
+Dokumen Phase 1 bersifat perencanaan dan tidak mengubah runtime atau database production.
